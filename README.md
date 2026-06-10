@@ -37,30 +37,54 @@ Desenvolvido para a disciplina **Mobile Development & IoT** — Global Solution 
 
 | Tela | Descrição |
 |------|-----------|
-| **Dashboard (Home)** | Painel com GPS, estatísticas de alertas por nível e os mais recentes |
-| **Listagem de Alertas** | Lista completa com filtros por tipo e nível de risco |
-| **Cadastrar Alerta** | Formulário com validação, captura GPS e seleção de tipo/nível |
+| **Login** | Autenticação com e-mail e senha, ou acesso sem conta |
+| **Cadastro** | Criação de conta com nome, e-mail e senha com validação |
+| **Dashboard (Home)** | Painel com mapa GPS ilustrativo, coordenadas em tempo real e estatísticas 2×2 |
+| **Listagem de Alertas** | Lista completa com filtros por tipo (Ativos, Perigo, Alerta, Normal, Resolvidos) |
+| **Registrar Alerta** | Formulário com validação, captura GPS e seleção de tipo/nível |
 | **Detalhes do Alerta** | Informações completas + opção de resolver a ocorrência |
 | **Confirmação** | Tela de status após registro bem-sucedido |
+| **Perfil** | Dados do usuário, toggle dark/light mode, mapa GPS e logout |
 
 ---
 
-## 🗺️ Recurso Mobile Utilizado — GPS
+## 🗺️ Recursos Mobile Nativos
 
-O app utiliza **Expo Location** para:
+### 📍 GPS — Expo Location
+- Solicita permissão de localização ao usuário
+- Captura coordenadas em tempo real (latitude e longitude)
+- Exibe coordenadas no Dashboard e na aba Perfil
+- Registra localização automaticamente ao cadastrar um alerta
+- Trata adequadamente a negação de permissão (alerta salvo sem coordenadas)
 
-- Solicitar permissão de localização ao usuário
-- Capturar coordenadas GPS em tempo real no Dashboard
-- Registrar automaticamente a latitude/longitude ao cadastrar um novo alerta
-- Tratar adequadamente a negação de permissão (alerta é salvo sem coordenadas)
+### 🗺️ Mapa Ilustrativo com Pin GPS
+- Mapa visual construído com React Native puro (sem API key)
+- Grade, ruas e blocos de parque desenhados com `View`
+- Pin GPS centralizado com animação de pulso (`Animated.Value`)
+- Exibe as coordenadas reais capturadas em overlay
+
+### 🌙 Dark / Light Mode
+- Sistema de temas completo via React Context (`ThemeContext`)
+- Toggle acessível na aba Perfil
+- Preferência salva no AsyncStorage (persiste entre sessões)
+- Todas as telas respondem ao tema dinamicamente
+
+### 🔐 Autenticação Local
+- Cadastro e login com AsyncStorage
+- Sem dependência de servidor externo
+- Sessão persistida entre aberturas do app
+- Logout com confirmação
 
 ---
 
 ## 🧭 Fluxo de Uso
 
 ```
-Dashboard → aba Registrar → preenche tipo, nível, descrição, captura GPS
-         → Confirmação → aba Alertas → toca no alerta → Detalhes → Resolver
+Login / Cadastro → Dashboard (mapa GPS + stats)
+               → aba Alertas (filtros)
+               → aba Registrar → captura GPS → Confirmação
+               → aba Perfil → toggle tema / logout
+               → Detalhes do Alerta → Resolver
 ```
 
 ---
@@ -72,9 +96,11 @@ Dashboard → aba Registrar → preenche tipo, nível, descrição, captura GPS
 | React Native 0.76 | Framework mobile |
 | Expo SDK 52 | Plataforma, build e ferramentas |
 | TypeScript | Tipagem estática |
-| Expo Router | Navegação (tabs + stack) |
+| Expo Router | Navegação (tabs + stack + auth group) |
 | Expo Location | GPS — recurso nativo |
-| AsyncStorage | Persistência local dos alertas |
+| AsyncStorage | Persistência local de alertas, usuários e tema |
+| React Context API | Sistema de tema dark/light global |
+| Animated API | Animação de pulso no pin GPS |
 | @expo/vector-icons | Ícones (Ionicons) |
 
 ---
@@ -84,8 +110,7 @@ Dashboard → aba Registrar → preenche tipo, nível, descrição, captura GPS
 ### Pré-requisitos
 
 - [Node.js 18+](https://nodejs.org/)
-- [Expo CLI](https://docs.expo.dev/): `npm install -g expo-cli`
-- Emulador Android (Android Studio) **ou** Expo Go no celular
+- Emulador Android (Android Studio) **ou** app **Expo Go** no celular
 
 ### Instalação
 
@@ -97,11 +122,13 @@ cd orbita-verde-mobile
 # Instale as dependências
 npm install
 
-# Inicie o app
-npx expo start
+# Inicie o app (Expo Go)
+npx expo start --go
 ```
 
 Pressione `a` para abrir no emulador Android, ou escaneie o QR code com o app **Expo Go** no celular.
+
+> ⚠️ **Importante:** use `npx expo start --go` para rodar no Expo Go sem precisar de build nativo.
 
 ---
 
@@ -110,25 +137,34 @@ Pressione `a` para abrir no emulador Android, ou escaneie o QR code com o app **
 ```
 orbita-verde-mobile/
 ├── app/
-│   ├── _layout.tsx          # Layout raiz (Stack navigator)
-│   ├── confirmacao.tsx      # Tela de confirmação após cadastro
+│   ├── _layout.tsx              # Layout raiz com ThemeProvider
+│   ├── confirmacao.tsx          # Tela de confirmação após cadastro
+│   ├── (auth)/
+│   │   ├── _layout.tsx          # Layout do grupo de autenticação
+│   │   ├── login.tsx            # Tela de login
+│   │   └── registro.tsx         # Tela de cadastro
 │   ├── alerta/
-│   │   └── [id].tsx         # Tela de detalhes do alerta
+│   │   └── [id].tsx             # Tela de detalhes do alerta
 │   └── (tabs)/
-│       ├── _layout.tsx      # Tab navigator
-│       ├── index.tsx        # Dashboard / Home
-│       ├── alertas.tsx      # Listagem com filtros
-│       └── cadastrar.tsx    # Formulário de cadastro
+│       ├── _layout.tsx          # Tab navigator (4 abas)
+│       ├── index.tsx            # Dashboard com mapa GPS
+│       ├── alertas.tsx          # Listagem com filtros
+│       ├── cadastrar.tsx        # Formulário de cadastro
+│       └── perfil.tsx           # Perfil, tema e localização
 ├── components/
-│   ├── AlertaCard.tsx       # Card reutilizável para listagem
-│   └── NivelBadge.tsx       # Badge de nível de risco colorido
+│   ├── AlertaCard.tsx           # Card reutilizável para listagem
+│   ├── NivelBadge.tsx           # Badge de nível de risco colorido
+│   └── MapaIlustrativo.tsx      # Mapa com pin GPS animado
+├── contexts/
+│   └── ThemeContext.tsx         # Contexto global de dark/light mode
 ├── services/
-│   └── storage.ts           # AsyncStorage — CRUD de alertas
+│   ├── storage.ts               # AsyncStorage — CRUD de alertas
+│   └── auth.ts                  # Autenticação local (login/cadastro)
 ├── types/
-│   └── index.ts             # Tipos TypeScript do domínio
+│   └── index.ts                 # Tipos TypeScript do domínio
 ├── constants/
-│   └── theme.ts             # Cores, helpers de tema
-├── app.json                 # Configuração Expo
+│   └── theme.ts                 # Paletas light/dark e helpers
+├── app.json                     # Configuração Expo
 └── package.json
 ```
 
@@ -138,9 +174,11 @@ orbita-verde-mobile/
 
 | Critério | Implementação |
 |----------|---------------|
-| Interface Mobile (20pts) | 5 telas com layout responsivo, tema dark, navegação tabs + stack |
-| Navegação e Fluxo (20pts) | Expo Router com fluxo completo: Home → Cadastro → Confirmação → Lista → Detalhes |
-| Manipulação de Dados (15pts) | AsyncStorage com dados iniciais pré-carregados e CRUD completo |
-| Recurso Mobile (15pts) | GPS via Expo Location — captura coordenadas e trata permissão negada |
-| Tratamento de Erros (10pts) | Validação de campos obrigatórios, mensagens de erro, fallback de localização |
-| Organização (20pts) | Separação clara entre telas, componentes, serviços e tipos |
+| **Interface Mobile** | 8 telas com layout responsivo, dark/light mode, navegação tabs + stack + auth |
+| **Navegação e Fluxo** | Expo Router com grupos `(auth)` e `(tabs)`, fluxo completo de autenticação e alertas |
+| **Manipulação de Dados** | AsyncStorage com CRUD de alertas, usuários e preferência de tema |
+| **Recurso Mobile — GPS** | Expo Location com captura de coordenadas, mapa ilustrativo animado e tratamento de permissão |
+| **Autenticação** | Login e cadastro locais com sessão persistida |
+| **Tratamento de Erros** | Validação de formulários, mensagens de erro, fallback de GPS, estado de carregamento |
+| **Dark / Light Mode** | ThemeContext com toggle persistido, todas as telas respondem dinamicamente |
+| **Organização** | Separação clara entre telas, componentes, contextos, serviços e tipos |
