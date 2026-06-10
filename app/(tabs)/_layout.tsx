@@ -1,31 +1,37 @@
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { COLORS } from '@/constants/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function TabsLayout() {
+  const { colors } = useTheme()
+
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: COLORS.fundo },
-        headerTintColor: COLORS.texto,
-        headerTitleStyle: { fontWeight: '700' },
+        headerStyle: { backgroundColor: colors.card },
+        headerTintColor: colors.texto,
+        headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+        headerShadowVisible: false,
         tabBarStyle: {
-          backgroundColor: COLORS.card,
-          borderTopColor: COLORS.cardBorda,
-          height: 60,
-          paddingBottom: 8,
+          backgroundColor: colors.card,
+          borderTopColor: colors.separador,
+          borderTopWidth: 0.5,
+          height: 82,
+          paddingBottom: 24,
+          paddingTop: 10,
         },
-        tabBarActiveTintColor: COLORS.verde,
-        tabBarInactiveTintColor: COLORS.textoSub,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarActiveTintColor: colors.verdeEscuro,
+        tabBarInactiveTintColor: colors.textoSub,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 2 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: 'Início',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+            <Ionicons name="home" size={size} color={color} />
           ),
         }}
       />
@@ -33,8 +39,9 @@ export default function TabsLayout() {
         name="alertas"
         options={{
           title: 'Alertas',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="warning-outline" size={size} color={color} />
+            <Ionicons name="warning" size={size} color={color} />
           ),
         }}
       />
@@ -42,8 +49,19 @@ export default function TabsLayout() {
         name="cadastrar"
         options={{
           title: 'Registrar',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" size={size} color={color} />
+            <Ionicons name="add-circle" size={size + 4} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="perfil"
+        options={{
+          title: 'Perfil',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-circle" size={size} color={color} />
           ),
         }}
       />

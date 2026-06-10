@@ -1,43 +1,40 @@
 import { useCallback, useState } from 'react'
 import {
   ActivityIndicator,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
-import { COLORS } from '@/constants/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import { listarAlertas } from '@/services/storage'
 import AlertaCard from '@/components/AlertaCard'
-import type { Alerta, NivelAlerta, TipoAlerta } from '@/types'
+import type { Alerta } from '@/types'
 
-type Filtro = 'TODOS' | 'ATIVOS' | 'RESOLVIDOS' | NivelAlerta | TipoAlerta
+type Filtro = 'ATIVOS' | 'TODOS' | 'PERIGO' | 'ALERTA' | 'NORMAL' | 'RESOLVIDOS'
 
 const filtros: { label: string; valor: Filtro }[] = [
-  { label: 'Todos', valor: 'TODOS' },
   { label: 'Ativos', valor: 'ATIVOS' },
+  { label: 'Todos', valor: 'TODOS' },
   { label: '🔴 Perigo', valor: 'PERIGO' },
   { label: '🟠 Alerta', valor: 'ALERTA' },
   { label: '🟢 Normal', valor: 'NORMAL' },
-  { label: '🔥 Queimada', valor: 'QUEIMADA' },
-  { label: '☀️ Flare', valor: 'FLARE_SOLAR' },
-  { label: '🌳 Desmata.', valor: 'DESMATAMENTO' },
+  { label: '✅ Resolvidos', valor: 'RESOLVIDOS' },
 ]
 
-const aplicarFiltro = (alertas: Alerta[], filtro: Filtro): Alerta[] => {
-  if (filtro === 'TODOS') return alertas
-  if (filtro === 'ATIVOS') return alertas.filter((a) => !a.resolvido)
-  if (filtro === 'RESOLVIDOS') return alertas.filter((a) => a.resolvido)
-  if (['PERIGO', 'ALERTA', 'NORMAL'].includes(filtro))
-    return alertas.filter((a) => a.nivel === filtro)
-  return alertas.filter((a) => a.tipo === filtro)
+const aplicar = (alertas: Alerta[], f: Filtro) => {
+  if (f === 'TODOS') return alertas
+  if (f === 'ATIVOS') return alertas.filter(a => !a.resolvido)
+  if (f === 'RESOLVIDOS') return alertas.filter(a => a.resolvido)
+  return alertas.filter(a => a.nivel === f)
 }
 
 export default function AlertasScreen() {
   const router = useRouter()
+  const { colors, sombra } = useTheme()
   const [alertas, setAlertas] = useState<Alerta[]>([])
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
@@ -52,65 +49,58 @@ export default function AlertasScreen() {
 
   useFocusEffect(useCallback(() => { carregar() }, []))
 
-  const listagem = aplicarFiltro(alertas, filtroAtivo)
+  const lista = aplicar(alertas, filtroAtivo)
 
   if (carregando) {
-    return (
-      <View style={styles.centro}>
-        <ActivityIndicator color={COLORS.verde} size="large" />
-      </View>
-    )
+    return <View style={[styles.centro, { backgroundColor: colors.fundo }]}><ActivityIndicator color={colors.verdeEscuro} size="large" /></View>
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.fundo }]}>
+      <View style={[styles.headerWrapper, { backgroundColor: colors.fundo }]}>
+        <Text style={[styles.titulo, { color: colors.texto }]}>Alertas</Text>
+        <Text style={[styles.subtitulo, { color: colors.textoSub }]}>{alertas.filter(a => !a.resolvido).length} ativos agora</Text>
+      </View>
+
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filtrosScroll}
+        horizontal showsHorizontalScrollIndicator={false}
+        style={[styles.filtrosScroll, { backgroundColor: colors.fundo }]}
         contentContainerStyle={styles.filtros}
       >
-        {filtros.map((f) => (
-          <Pressable
+        {filtros.map(f => (
+          <TouchableOpacity
             key={f.valor}
-            style={[styles.filtro, filtroAtivo === f.valor && styles.filtroAtivo]}
+            style={[styles.chip, { backgroundColor: colors.card }, sombra as any, filtroAtivo === f.valor && { backgroundColor: colors.verdeEscuro }]}
             onPress={() => setFiltroAtivo(f.valor)}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.filtroTexto, filtroAtivo === f.valor && styles.filtroTextoAtivo]}>
+            <Text style={[styles.chipTexto, { color: filtroAtivo === f.valor ? '#fff' : colors.textoSub }]}>
               {f.label}
             </Text>
-          </Pressable>
+          </TouchableOpacity>
         ))}
       </ScrollView>
 
       <ScrollView
-        style={styles.lista}
-        contentContainerStyle={styles.listaConteudo}
+        style={styles.lista} contentContainerStyle={styles.listaConteudo}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={atualizando}
+          <RefreshControl refreshing={atualizando}
             onRefresh={() => { setAtualizando(true); carregar() }}
-            tintColor={COLORS.verde}
-          />
+            tintColor={colors.verdeEscuro} />
         }
       >
-        <Text style={styles.total}>
-          {listagem.length} resultado{listagem.length !== 1 ? 's' : ''}
-        </Text>
+        <Text style={[styles.contagem, { color: colors.textoSub }]}>{lista.length} resultado{lista.length !== 1 ? 's' : ''}</Text>
 
-        {listagem.length === 0 ? (
-          <View style={styles.vazio}>
-            <Text style={styles.vazioEmoji}>🔍</Text>
-            <Text style={styles.vazioTexto}>Nenhum alerta encontrado</Text>
-            <Text style={styles.vazioSub}>Tente outro filtro</Text>
+        {lista.length === 0 ? (
+          <View style={[styles.vazio, { backgroundColor: colors.card }, sombra as any]}>
+            <Text style={{ fontSize: 36, marginBottom: 8 }}>🔍</Text>
+            <Text style={[styles.vazioTexto, { color: colors.texto }]}>Nenhum alerta encontrado</Text>
+            <Text style={[styles.vazioSub, { color: colors.textoSub }]}>Tente outro filtro</Text>
           </View>
         ) : (
-          listagem.map((alerta) => (
-            <AlertaCard
-              key={alerta.id}
-              alerta={alerta}
-              onPress={() => router.push(`/alerta/${alerta.id}`)}
-            />
+          lista.map(a => (
+            <AlertaCard key={a.id} alerta={a} onPress={() => router.push(`/alerta/${a.id}`)} />
           ))
         )}
       </ScrollView>
@@ -119,33 +109,19 @@ export default function AlertasScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.fundo },
-  centro: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.fundo },
-  filtrosScroll: { maxHeight: 52, flexGrow: 0 },
-  filtros: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  filtro: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorda,
-  },
-  filtroAtivo: {
-    backgroundColor: COLORS.verde + '22',
-    borderColor: COLORS.verde,
-  },
-  filtroTexto: { color: COLORS.textoSub, fontSize: 12, fontWeight: '600' },
-  filtroTextoAtivo: { color: COLORS.verde },
+  container: { flex: 1 },
+  centro: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  headerWrapper: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16 },
+  titulo: { fontSize: 32, fontWeight: '800', letterSpacing: -0.5 },
+  subtitulo: { fontSize: 14, marginTop: 2 },
+  filtrosScroll: { maxHeight: 48, flexGrow: 0 },
+  filtros: { paddingHorizontal: 20, gap: 8 },
+  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  chipTexto: { fontSize: 13, fontWeight: '600' },
   lista: { flex: 1 },
-  listaConteudo: { padding: 16, paddingBottom: 32 },
-  total: { color: COLORS.textoSub, fontSize: 12, marginBottom: 12 },
-  vazio: { alignItems: 'center', paddingVertical: 48 },
-  vazioEmoji: { fontSize: 40, marginBottom: 12 },
-  vazioTexto: { color: COLORS.texto, fontSize: 16, fontWeight: '600' },
-  vazioSub: { color: COLORS.textoSub, fontSize: 13, marginTop: 4 },
+  listaConteudo: { padding: 20, paddingTop: 16, paddingBottom: 40 },
+  contagem: { fontSize: 13, marginBottom: 14, fontWeight: '500' },
+  vazio: { borderRadius: 16, padding: 32, alignItems: 'center' },
+  vazioTexto: { fontSize: 16, fontWeight: '700' },
+  vazioSub: { fontSize: 13, marginTop: 4 },
 })

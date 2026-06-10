@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { COLORS, nivelCor, tipoEmoji } from '@/constants/theme'
-import NivelBadge from './NivelBadge'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { nivelCor, tipoEmoji } from '@/constants/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { Alerta } from '@/types'
 
 interface Props {
@@ -18,89 +19,60 @@ const formatarTempo = (iso: string) => {
 }
 
 export default function AlertaCard({ alerta, onPress }: Props) {
-  const cor = nivelCor(alerta.nivel)
+  const { colors, sombra } = useTheme()
+  const cor = nivelCor(alerta.nivel, colors)
+
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && { opacity: 0.75 }]}
-      onPress={onPress}
+    <TouchableOpacity
+      style={[styles.card, { backgroundColor: colors.card }, sombra as any]}
+      onPress={onPress} activeOpacity={0.75}
     >
-      <View style={[styles.barra, { backgroundColor: cor }]} />
+      <View style={[styles.iconBox, { backgroundColor: cor + '18' }]}>
+        <Text style={styles.emoji}>{tipoEmoji(alerta.tipo)}</Text>
+      </View>
       <View style={styles.corpo}>
         <View style={styles.topo}>
-          <Text style={styles.tipo}>
-            {tipoEmoji(alerta.tipo)} {alerta.tipo.replace('_', ' ')}
+          <Text style={[styles.tipo, { color: colors.texto }]} numberOfLines={1}>
+            {alerta.tipo.replace('_', ' ')}
           </Text>
+          <Text style={[styles.tempo, { color: colors.textoSub }]}>{formatarTempo(alerta.criadoEm)}</Text>
+        </View>
+        <Text style={[styles.descricao, { color: colors.textoSub }]} numberOfLines={2}>{alerta.descricao}</Text>
+        <View style={styles.rodape}>
+          <View style={[styles.nivelPill, { backgroundColor: cor + '18' }]}>
+            <View style={[styles.dot, { backgroundColor: cor }]} />
+            <Text style={[styles.nivelTexto, { color: cor }]}>{alerta.nivel}</Text>
+          </View>
           {alerta.resolvido && (
-            <View style={styles.resolvidoBadge}>
-              <Text style={styles.resolvidoTexto}>✓ RESOLVIDO</Text>
+            <View style={[styles.resolvidoPill, { backgroundColor: colors.verde + '18' }]}>
+              <Ionicons name="checkmark-circle" size={12} color={colors.verde} />
+              <Text style={[styles.resolvidoTexto, { color: colors.verde }]}>Resolvido</Text>
             </View>
           )}
         </View>
-        <Text style={styles.descricao} numberOfLines={2}>
-          {alerta.descricao}
-        </Text>
-        <View style={styles.rodape}>
-          <NivelBadge nivel={alerta.nivel} />
-          <Text style={styles.tempo}>{formatarTempo(alerta.criadoEm)}</Text>
-        </View>
       </View>
-    </Pressable>
+      <Ionicons name="chevron-forward" size={16} color={colors.textoSub} />
+    </TouchableOpacity>
   )
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorda,
+    borderRadius: 16, padding: 14,
+    flexDirection: 'row', alignItems: 'center',
+    gap: 12, marginBottom: 10,
   },
-  barra: {
-    width: 4,
-  },
-  corpo: {
-    flex: 1,
-    padding: 14,
-    gap: 8,
-  },
-  topo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  tipo: {
-    color: COLORS.texto,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  descricao: {
-    color: COLORS.textoSub,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  rodape: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  tempo: {
-    color: COLORS.textoSub,
-    fontSize: 11,
-  },
-  resolvidoBadge: {
-    backgroundColor: COLORS.verde + '22',
-    borderColor: COLORS.verde,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  resolvidoTexto: {
-    color: COLORS.verde,
-    fontSize: 10,
-    fontWeight: '700',
-  },
+  iconBox: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 22 },
+  corpo: { flex: 1, gap: 4 },
+  topo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  tipo: { fontSize: 14, fontWeight: '700', flex: 1 },
+  tempo: { fontSize: 11, marginLeft: 8 },
+  descricao: { fontSize: 12, lineHeight: 17 },
+  rodape: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 2 },
+  nivelPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  nivelTexto: { fontSize: 11, fontWeight: '700' },
+  resolvidoPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  resolvidoTexto: { fontSize: 11, fontWeight: '600' },
 })

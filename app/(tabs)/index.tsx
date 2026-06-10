@@ -5,23 +5,43 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import * as Location from 'expo-location'
 import { Ionicons } from '@expo/vector-icons'
-import { COLORS, nivelCor } from '@/constants/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import { listarAlertas } from '@/services/storage'
 import AlertaCard from '@/components/AlertaCard'
+import MapaIlustrativo from '@/components/MapaIlustrativo'
 import type { Alerta } from '@/types'
+
+const agora = () => {
+  const d = new Date()
+  return d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
 export default function HomeScreen() {
   const router = useRouter()
+  const { colors, sombra } = useTheme()
   const [alertas, setAlertas] = useState<Alerta[]>([])
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
-  const [localizacao, setLocalizacao] = useState<string>('Obtendo localização...')
-  const [permissaoNegada, setPermissaoNegada] = useState(false)
+  const [lat, setLat] = useState<number | null>(null)
+  const [lon, setLon] = useState<number | null>(null)
+  const [gpsOk, setGpsOk] = useState(false)
+
+  const obterGPS = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync()
+    if (status !== 'granted') return
+    try {
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      setLat(pos.coords.latitude)
+      setLon(pos.coords.longitude)
+      setGpsOk(true)
+    } catch {}
+  }
 
   const carregarAlertas = async () => {
     const dados = await listarAlertas()
@@ -30,194 +50,140 @@ export default function HomeScreen() {
     setAtualizando(false)
   }
 
-  const obterLocalizacao = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync()
-    if (status !== 'granted') {
-      setPermissaoNegada(true)
-      setLocalizacao('Permissão de localização negada')
-      return
-    }
-    try {
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-      setLocalizacao(
-        `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`
-      )
-    } catch {
-      setLocalizacao('Não foi possível obter localização')
-    }
-  }
-
-  useEffect(() => {
-    obterLocalizacao()
-  }, [])
-
-  useFocusEffect(
-    useCallback(() => {
-      carregarAlertas()
-    }, [])
-  )
+  useEffect(() => { obterGPS() }, [])
+  useFocusEffect(useCallback(() => { carregarAlertas() }, []))
 
   const ativos = alertas.filter((a) => !a.resolvido)
   const perigo = ativos.filter((a) => a.nivel === 'PERIGO').length
   const alerta = ativos.filter((a) => a.nivel === 'ALERTA').length
-  const normal = ativos.filter((a) => a.nivel === 'NORMAL').length
-  const recentes = ativos.slice(0, 3)
 
   if (carregando) {
-    return (
-      <View style={styles.centro}>
-        <ActivityIndicator color={COLORS.verde} size="large" />
-      </View>
-    )
+    return <View style={[styles.centro, { backgroundColor: colors.fundo }]}><ActivityIndicator color={colors.verdeEscuro} size="large" /></View>
   }
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.fundo }]}
       contentContainerStyle={styles.conteudo}
+      showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={atualizando}
           onRefresh={() => { setAtualizando(true); carregarAlertas() }}
-          tintColor={COLORS.verde}
+          tintColor={colors.verdeEscuro}
         />
       }
     >
+      {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.titulo}>🛰️ OrbitaVerde</Text>
-        <Text style={styles.subtitulo}>Monitoramento Ambiental Satelital</Text>
+        <View>
+          <Text style={[styles.saudacao, { color: colors.texto }]}>🛰️ OrbitaVerde</Text>
+          <Text style={[styles.data, { color: colors.textoSub }]}>{agora()}</Text>
+        </View>
+        <TouchableOpacity style={[styles.notifBtn, { backgroundColor: colors.card }, sombra as any]} onPress={() => router.push('/alertas')}>
+          <Ionicons name="notifications" size={20} color={colors.verdeEscuro} />
+          {ativos.length > 0 && (
+            <View style={[styles.badge, { backgroundColor: colors.perigo }]}>
+              <Text style={styles.badgeTexto}>{ativos.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.gpsCard}>
-        <Ionicons
-          name={permissaoNegada ? 'location-off-outline' : 'location-outline'}
-          size={18}
-          color={permissaoNegada ? COLORS.erro : COLORS.verde}
-        />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.gpsLabel}>Sua localização (GPS)</Text>
-          <Text style={[styles.gpsCoordenadas, permissaoNegada && { color: COLORS.erro }]}>
-            {localizacao}
-          </Text>
-          {permissaoNegada && (
-            <Text style={styles.gpsErro}>Permissão negada pelo usuário</Text>
-          )}
+      {/* GPS CARD COM MAPA */}
+      <View style={[styles.card, { backgroundColor: colors.card }, sombra as any, { marginBottom: 24, padding: 16 }]}>
+        <View style={styles.gpsHeader}>
+          <View style={[styles.gpsIconBox, { backgroundColor: gpsOk ? colors.verde + '18' : colors.input }]}>
+            <Ionicons name={gpsOk ? 'location' : 'location-outline'} size={22} color={gpsOk ? colors.verdeEscuro : colors.textoSub} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.gpsLabel, { color: colors.textoSub }]}>Localização atual</Text>
+            <Text style={[styles.gpsValor, { color: gpsOk ? colors.texto : colors.textoSub }]}>
+              {gpsOk && lat !== null ? `${lat.toFixed(4)}°, ${lon?.toFixed(4)}°` : 'GPS indisponível no emulador'}
+            </Text>
+          </View>
+          <View style={[styles.statusDot, { backgroundColor: gpsOk ? colors.verde : colors.textoSub }]} />
+        </View>
+        <View style={{ marginTop: 12 }}>
+          <MapaIlustrativo latitude={lat} longitude={lon} />
         </View>
       </View>
 
-      <Text style={styles.secao}>Painel de Alertas</Text>
-
-      <View style={styles.statsRow}>
-        {[
-          { label: 'PERIGO', valor: perigo, cor: COLORS.perigo },
-          { label: 'ALERTA', valor: alerta, cor: COLORS.alerta },
-          { label: 'NORMAL', valor: normal, cor: COLORS.normal },
-        ].map((stat) => (
-          <View key={stat.label} style={[styles.statCard, { borderColor: stat.cor }]}>
-            <Text style={[styles.statValor, { color: stat.cor }]}>{stat.valor}</Text>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-          </View>
-        ))}
+      {/* SEÇÃO HOJE */}
+      <View style={styles.secaoHeader}>
+        <Text style={[styles.secaoTitulo, { color: colors.texto }]}>Hoje</Text>
+        <Text style={[styles.secaoSub, { color: colors.textoSub }]}>{new Date().toLocaleDateString('pt-BR')}</Text>
       </View>
 
-      <View style={styles.totalCard}>
-        <Text style={styles.totalTexto}>
-          {ativos.length} alerta{ativos.length !== 1 ? 's' : ''} ativo{ativos.length !== 1 ? 's' : ''}
-        </Text>
-        <Text style={styles.totalSub}>
-          {alertas.filter((a) => a.resolvido).length} resolvido{alertas.filter((a) => a.resolvido).length !== 1 ? 's' : ''}
-        </Text>
+      {/* STATS 2x2 */}
+      <View style={styles.statsGrid}>
+        <StatCard label="Ativos" valor={ativos.length} cor={colors.verdeEscuro} icone="pulse" colors={colors} sombra={sombra} />
+        <StatCard label="Perigo" valor={perigo} cor={colors.perigo} icone="flame" colors={colors} sombra={sombra} />
+        <StatCard label="Alerta" valor={alerta} cor={colors.alerta} icone="warning" colors={colors} sombra={sombra} />
+        <StatCard label="Resolvidos" valor={alertas.filter(a => a.resolvido).length} cor={colors.textoSub} icone="checkmark-circle" colors={colors} sombra={sombra} />
       </View>
 
-      <Text style={styles.secao}>Alertas Recentes</Text>
+      {/* ALERTAS RECENTES */}
+      <View style={styles.secaoHeader}>
+        <Text style={[styles.secaoTitulo, { color: colors.texto }]}>Alertas recentes</Text>
+        <TouchableOpacity onPress={() => router.push('/alertas')}>
+          <Text style={[styles.verTodos, { color: colors.verdeEscuro }]}>Ver todos →</Text>
+        </TouchableOpacity>
+      </View>
 
-      {recentes.length === 0 ? (
-        <View style={styles.vazio}>
-          <Text style={styles.vazioTexto}>✅ Nenhum alerta ativo no momento</Text>
+      {ativos.length === 0 ? (
+        <View style={[styles.card, { backgroundColor: colors.card, padding: 32, alignItems: 'center', gap: 6 }, sombra as any]}>
+          <Text style={{ fontSize: 36, marginBottom: 4 }}>✅</Text>
+          <Text style={[styles.vazioTexto, { color: colors.texto }]}>Nenhum alerta ativo</Text>
+          <Text style={[styles.vazioSub, { color: colors.textoSub }]}>O sistema está operando normalmente</Text>
         </View>
       ) : (
-        recentes.map((alerta) => (
-          <AlertaCard
-            key={alerta.id}
-            alerta={alerta}
-            onPress={() => router.push(`/alerta/${alerta.id}`)}
-          />
+        ativos.slice(0, 3).map((a) => (
+          <AlertaCard key={a.id} alerta={a} onPress={() => router.push(`/alerta/${a.id}`)} />
         ))
-      )}
-
-      {ativos.length > 3 && (
-        <Text
-          style={styles.verTodos}
-          onPress={() => router.push('/alertas')}
-        >
-          Ver todos os {ativos.length} alertas →
-        </Text>
       )}
     </ScrollView>
   )
 }
 
+function StatCard({ label, valor, cor, icone, colors, sombra }: {
+  label: string; valor: number; cor: string; icone: string; colors: any; sombra: any
+}) {
+  return (
+    <View style={[styles.card, { backgroundColor: colors.card, width: '47%', padding: 16, gap: 6 }, sombra]}>
+      <View style={[styles.statIconBox, { backgroundColor: cor + '15' }]}>
+        <Ionicons name={icone as any} size={18} color={cor} />
+      </View>
+      <Text style={[styles.statValor, { color: cor }]}>{valor}</Text>
+      <Text style={[styles.statLabel, { color: colors.textoSub }]}>{label}</Text>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.fundo },
-  conteudo: { padding: 16, paddingBottom: 32 },
-  centro: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.fundo },
-  header: { marginBottom: 20 },
-  titulo: { fontSize: 24, fontWeight: '800', color: COLORS.texto },
-  subtitulo: { fontSize: 13, color: COLORS.textoSub, marginTop: 2 },
-  gpsCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorda,
-    marginBottom: 20,
-  },
-  gpsLabel: { fontSize: 11, color: COLORS.textoSub, marginBottom: 2 },
-  gpsCoordenadas: { fontSize: 13, color: COLORS.verde, fontWeight: '600', fontFamily: 'monospace' },
-  gpsErro: { fontSize: 11, color: COLORS.erro, marginTop: 2 },
-  secao: { fontSize: 14, fontWeight: '700', color: COLORS.textoSub, marginBottom: 12, letterSpacing: 0.5 },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  statValor: { fontSize: 28, fontWeight: '800' },
-  statLabel: { fontSize: 10, color: COLORS.textoSub, fontWeight: '600', marginTop: 2 },
-  totalCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorda,
-    marginBottom: 20,
-  },
-  totalTexto: { fontSize: 15, fontWeight: '700', color: COLORS.texto },
-  totalSub: { fontSize: 13, color: COLORS.textoSub },
-  vazio: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorda,
-  },
-  vazioTexto: { color: COLORS.textoSub, fontSize: 14 },
-  verTodos: {
-    textAlign: 'center',
-    color: COLORS.verde,
-    fontWeight: '600',
-    fontSize: 14,
-    marginTop: 4,
-    paddingVertical: 8,
-  },
+  container: { flex: 1 },
+  conteudo: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 40 },
+  centro: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  saudacao: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  data: { fontSize: 13, marginTop: 2, textTransform: 'capitalize' },
+  notifBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  badge: { position: 'absolute', top: -2, right: -2, borderRadius: 8, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
+  badgeTexto: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  card: { borderRadius: 16 },
+  gpsHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  gpsIconBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  gpsLabel: { fontSize: 11, marginBottom: 2, fontWeight: '500' },
+  gpsValor: { fontSize: 13, fontWeight: '600', fontFamily: 'monospace' },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  secaoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  secaoTitulo: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  secaoSub: { fontSize: 13 },
+  verTodos: { fontSize: 14, fontWeight: '600' },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 },
+  statIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  statValor: { fontSize: 32, fontWeight: '800', letterSpacing: -1 },
+  statLabel: { fontSize: 13, fontWeight: '500' },
+  vazioTexto: { fontSize: 16, fontWeight: '700' },
+  vazioSub: { fontSize: 13 },
 })
